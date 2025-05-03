@@ -300,5 +300,3 @@ class CombineMessagesPlugin(Star):
         # 注册早期拦截函数
         if hasattr(self.context, "register_early_intercept"):
             self.context.register_early_intercept(early_intercept)
-        else:
-            logger.warning("当前AstrBot版本不支持早期消息拦截，合并消息可能无法完全生效")
