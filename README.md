@@ -22,6 +22,10 @@ Bot会每一条<br>
 
 欢迎大家使用并提出宝贵的意见，我会认真查看并改进的。
 
+## 效果展示
+![1](https://fultal.qinyan.org/Snipaste_2025-05-03_19-11-43.png)
+![2](https://fultal.qinyan.org/Snipaste_2025-05-03_19-13-00.png)
+
 ## 功能特点
 
 - 自动合并同一用户在短时间内发送的多条消息
