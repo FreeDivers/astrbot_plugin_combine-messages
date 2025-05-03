@@ -4,6 +4,8 @@
 
 本插件由 Claude 3.7 Sonnet 制作，我向它提供了方向指导。
 
+参考了 [**麦麦**](https://github.com/MaiM-with-u/MaiBot) 的消息合并机制。
+
 
 人类打字<br>
 都喜欢打几个字<br>
