@@ -3,6 +3,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from astrbot.api.message_components import Plain, Image, BaseMessageComponent
 import asyncio
+import uuid
 from typing import List
 from astrbot.api.platform import AstrBotMessage, MessageMember, MessageType, PlatformMetadata
 
@@ -97,7 +98,9 @@ class MessageBuffer:
                 new_message_obj.message_str = merged_str
                 new_message_obj.message = components  # This is the key change to pass full components
                 new_message_obj.timestamp = int(asyncio.get_event_loop().time())
-                new_message_obj.message_id = f"combined-{event.message_obj.message_id}"
+                
+                original_msg_id = getattr(event.message_obj, 'message_id', str(uuid.uuid4()))
+                new_message_obj.message_id = f"combined-{original_msg_id}"
 
                 event_args = {
                     "message_str": merged_str,
@@ -231,7 +234,12 @@ class CombineMessagesPlugin(Star):
         if not self.enabled:
             return
         
-        if event.message_str.startswith("/") or event.message_str.startswith("!") or event.message_str.startswith("."):
+        # Firewall I: Ignore commands robustly
+        if event.message_str.startswith(("/", "!", "！", ".", "。")):
+            return
+        
+        # Firewall II: Ignore system prompts from other plugins
+        if "[SYS_PROMPT]" in event.message_str:
             return
         
         has_content_to_merge = False
