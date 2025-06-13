@@ -7,6 +7,12 @@ import uuid
 from typing import List
 from astrbot.api.platform import AstrBotMessage, MessageMember, MessageType, PlatformMetadata
 
+#来自railgun19457的修改，添加了读取其他插件指令的功能{get_all_command_names()}，用于命令类消息的屏蔽，修改了firewall部分
+#其他修改，把delay和interval的下限都改为了0.1
+from astrbot.core.star.filter.command import CommandFilter
+from astrbot.core.star.filter.command_group import CommandGroupFilter
+from astrbot.core.star.star_handler import star_handlers_registry, StarHandlerMetadata
+
 # 预留图片识别接口
 async def recognize_image_content(image: Image) -> str:
     # TODO: 调用实际图片识别API
@@ -144,6 +150,40 @@ class CombineMessagesPlugin(Star):
         message_buffer.context = self.context
         logger.info("消息合并插件已初始化")
 
+    def get_all_command_names(self) -> set[str]:
+        """返回所有插件中注册的命令名称，不包含描述，格式为 {'签到', '点歌', ...}"""
+        command_names = set()
+        try:
+            all_stars_metadata = self.context.get_all_stars()
+            all_stars_metadata = [star for star in all_stars_metadata if star.activated]
+        except Exception as e:
+            logger.error(f"获取插件列表失败: {e}")
+            return set()
+        for star in all_stars_metadata:
+            plugin_name = getattr(star, "name", None)
+            plugin_instance = getattr(star, "star_cls", None)
+            module_path = getattr(star, "module_path", None)
+
+            if plugin_name in {"astrbot", "astrbot_plugin_help", "astrbot-reminder"}:
+                continue
+            if not plugin_name or not module_path or not isinstance(plugin_instance, Star):
+                continue
+
+            for handler in star_handlers_registry:
+                if not isinstance(handler, StarHandlerMetadata):
+                    continue
+                if handler.handler_module_path != module_path:
+                    continue
+
+                for f in handler.event_filters:
+                    if isinstance(f, CommandFilter):
+                        command_names.add(f.command_name)
+                        break
+                    elif isinstance(f, CommandGroupFilter):
+                        command_names.add(f.group_name)
+                        break
+        return command_names
+
     @filter.command("combine_on")
     async def enable_combine(self, event: AstrMessageEvent):
         self.enabled = True
@@ -170,8 +210,8 @@ class CombineMessagesPlugin(Star):
             args = event.message_str.split()
             if len(args) > 1:
                 interval = float(args[1])
-                if interval < 0.5:
-                    interval = 0.5
+                if interval < 0.1:
+                    interval = 0.1
                 elif interval > 10:
                     interval = 10
                 self.interval_time = interval
@@ -233,15 +273,26 @@ class CombineMessagesPlugin(Star):
 
         if not self.enabled:
             return
-        
-        # Firewall I: Ignore commands robustly
-        if event.message_str.startswith(("/", "!", "！", ".", "。")):
+
+        msg_text = event.message_str.strip()
+
+        # Firewall I-1: 快速过滤特殊符号开头的命令
+        special_prefixes = ("/", "!", "！", ".", "。", "#", "%")
+        if msg_text.startswith(special_prefixes):     
+            logger.debug(f"跳过前缀指令：{msg_text[:20]}...")
             return
-        
-        # Firewall II: Ignore system prompts from other plugins
-        if "[SYS_PROMPT]" in event.message_str:
+
+        # Firewall I-2: 进一步检查是否为命令名（无前缀但为插件命令）
+        first_token = msg_text.split()[0] if msg_text else ""
+        all_commands = self.get_all_command_names()
+        if first_token in all_commands:
+            logger.debug(f"跳过插件注册命令：{first_token}")
             return
-        
+
+        # Firewall II: 忽略系统提示类消息
+        if "[SYS_PROMPT]" in msg_text:
+            return
+
         has_content_to_merge = False
         for comp in getattr(event.message_obj, 'message', []):
             if isinstance(comp, Plain) and comp.text and comp.text.strip():
@@ -254,6 +305,3 @@ class CombineMessagesPlugin(Star):
         if has_content_to_merge:
             logger.info(f"消息已缓存用于合并: {event.get_message_outline()[:30]}...")
             event.stop_event()
-
-    async def terminate(self):
-        logger.info("消息合并插件已销毁")
