@@ -134,7 +134,7 @@ class MessageBuffer:
 
 message_buffer = None
 
-@register("combine_messages", "他不回复我的原因", "自动合并连续消息，防止刷屏", "2.0.0")
+@register("combine_messages", "合并消息", "自动合并连续消息，防止刷屏", "2.0.0")
 class CombineMessagesPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
