@@ -24,7 +24,7 @@ class MessageBuffer:
         self.buffer_pool = {}
         self.lock = asyncio.Lock()
         self.interval_time = 3
-        self.initial_delay = 0.5  # 新增初始强制延迟
+        self.initial_delay = 0.5
         self.context = context
 
     def get_session_id(self, event: AstrMessageEvent):
@@ -142,14 +142,14 @@ class CombineMessagesPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self.enabled = True
-        self.interval_time = 3
+        self.interval_time = 3.0
         self.initial_delay = 0.5
         global message_buffer
         message_buffer = MessageBuffer(context)
 
     async def initialize(self):
         message_buffer.interval_time = self.interval_time
-        message_buffer.initial_delay = getattr(self, 'initial_delay', 0.5)
+        message_buffer.initial_delay = self.initial_delay
         message_buffer.context = self.context
         logger.info("消息合并插件已初始化")
 
@@ -190,22 +190,12 @@ class CombineMessagesPlugin(Star):
     @filter.command("combine_on")
     async def enable_combine(self, event: AstrMessageEvent):
         self.enabled = True
-        logger.info("已开启消息合并功能")
-        try:
-            await event.send(MessageChain([Plain("已开启消息合并功能")]))
-        except Exception as e:
-            logger.error(f"回复消息失败: {e}")
-            yield event.plain_result("已开启消息合并功能")
+        yield event.plain_result("消息合并功能已开启。")
 
     @filter.command("combine_off")
     async def disable_combine(self, event: AstrMessageEvent):
         self.enabled = False
-        logger.info("已关闭消息合并功能")
-        try:
-            await event.send(MessageChain([Plain("已关闭消息合并功能")]))
-        except Exception as e:
-            logger.error(f"回复消息失败: {e}")
-            yield event.plain_result("已关闭消息合并功能")
+        yield event.plain_result("消息合并功能已关闭。")
 
     @filter.command("combine_interval")
     async def set_interval(self, event: AstrMessageEvent):
@@ -219,24 +209,11 @@ class CombineMessagesPlugin(Star):
                     interval = 10
                 self.interval_time = interval
                 message_buffer.interval_time = interval
-                response = f"已设置消息合并间隔为 {interval} 秒"
+                yield event.plain_result(f"已设置消息合并间隔为 {interval} 秒。")
             else:
-                response = f"当前消息合并间隔为 {self.interval_time} 秒"
-                
-            logger.info(response)
-            try:
-                await event.send(MessageChain([Plain(response)]))
-            except Exception as e:
-                logger.error(f"回复消息失败: {e}")
-                yield event.plain_result(response)
+                yield event.plain_result(f"当前消息合并间隔为 {self.interval_time} 秒。用法: /combine_interval [秒数]")
         except Exception as e:
-            error_msg = f"设置失败: {str(e)}"
-            logger.error(error_msg)
-            try:
-                await event.send(MessageChain([Plain(error_msg)]))
-            except Exception as e2:
-                logger.error(f"回复消息失败: {e2}")
-                yield event.plain_result(error_msg)
+            yield event.plain_result(f"设置失败: {str(e)}")
 
     @filter.command("combine_delay")
     async def set_delay(self, event: AstrMessageEvent):
@@ -250,24 +227,11 @@ class CombineMessagesPlugin(Star):
                     delay = 2
                 self.initial_delay = delay
                 message_buffer.initial_delay = delay
-                response = f"已设置初始强制延迟为 {delay} 秒"
+                yield event.plain_result(f"已设置初始强制延迟为 {delay} 秒。")
             else:
-                response = f"当前初始强制延迟为 {getattr(self, 'initial_delay', 0.5)} 秒"
-                
-            logger.info(response)
-            try:
-                await event.send(MessageChain([Plain(response)]))
-            except Exception as e:
-                logger.error(f"回复消息失败: {e}")
-                yield event.plain_result(response)
+                yield event.plain_result(f"当前初始强制延迟为 {self.initial_delay} 秒。用法: /combine_delay [秒数]")
         except Exception as e:
-            error_msg = f"设置失败: {str(e)}"
-            logger.error(error_msg)
-            try:
-                await event.send(MessageChain([Plain(error_msg)]))
-            except Exception as e2:
-                logger.error(f"回复消息失败: {e2}")
-                yield event.plain_result(error_msg)
+            yield event.plain_result(f"设置失败: {str(e)}")
 
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE | filter.EventMessageType.PRIVATE_MESSAGE)
     async def on_message(self, event: AstrMessageEvent, ctx, *args, **kwargs):
@@ -276,7 +240,7 @@ class CombineMessagesPlugin(Star):
 
         if not self.enabled:
             return
-
+        
         msg_text = event.message_str.strip()
 
         # Firewall I-1: 快速过滤特殊符号开头的命令
@@ -311,3 +275,6 @@ class CombineMessagesPlugin(Star):
         if has_content_to_merge:
             logger.info(f"消息已缓存用于合并: {event.get_message_outline()[:30]}...")
             event.stop_event()
+
+    async def terminate(self):
+        logger.info("消息合并插件已销毁")
