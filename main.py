@@ -1,7 +1,7 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageChain
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from astrbot.api.message_components import Plain, Image, BaseMessageComponent
+from astrbot.api.message_components import Plain, Image, BaseMessageComponent, At
 import asyncio
 import uuid
 from typing import List
@@ -84,6 +84,9 @@ class MessageBuffer:
                     merged_str_parts.append(comp.text.strip())
                 elif isinstance(comp, Image):
                     merged_str_parts.append("[图片]")
+                elif isinstance(comp, At):
+                    merged_str_parts.append(f"@{comp.name or comp.qq}")
+
             merged_str = " ".join(merged_str_parts)
 
             if not merged_str.strip():
@@ -134,7 +137,7 @@ class MessageBuffer:
 
 message_buffer = None
 
-@register("combine_messages", "他不回复我的原因", "自动合并连续消息，防止刷屏", "2.0.0")
+@register("combine_messages", "合并消息", "自动合并连续消息，防止刷屏", "2.0.0")
 class CombineMessagesPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -299,6 +302,9 @@ class CombineMessagesPlugin(Star):
                 await message_buffer.add_component(event, comp)
                 has_content_to_merge = True
             elif isinstance(comp, Image):
+                await message_buffer.add_component(event, comp)
+                has_content_to_merge = True
+            elif isinstance(comp, At):
                 await message_buffer.add_component(event, comp)
                 has_content_to_merge = True
         
