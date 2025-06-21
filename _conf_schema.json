@@ -1,0 +1,35 @@
+{
+  "enabled": {
+    "description": "是否启用消息合并",
+    "type": "bool",
+    "default": true
+  },
+  "interval_time": {
+    "description": "合并消息的最大间隔（秒）",
+    "type": "float",
+    "default": 3
+  },
+  "initial_delay": {
+    "description": "首次消息后的延迟（秒）",
+    "type": "float",
+    "default": 0.5
+  },
+  "extra_commands": {
+    "description": "自定义屏蔽指令列表",
+    "hint": "插件会自动屏蔽指令类消息，防止二次响应，但是部分指令可能读取不到，可在此处添加",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": ["llm"]
+  },
+  "block_prefixes": {
+    "description": "自定义屏蔽符号前缀列表",
+    "hint": "遇到这些前缀的消息将不会被合并，如：'/', '!', '！', '.', '。', '#', '%'",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": ["/", "!",  ".", "。", "#", "%"]
+  }
+}
