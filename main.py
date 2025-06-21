@@ -160,7 +160,7 @@ class MessageBuffer:
             self.buffer_pool.clear()
 
 
-@register("combine_messages", "他不回复我的原因", "自动合并连续消息，防止刷屏", "2.0.0")
+@register("combine_messages", "合并消息", "自动合并连续消息，防止刷屏", "2.0.0")
 class CombineMessagesPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -218,26 +218,12 @@ class CombineMessagesPlugin(Star):
     @filter.command("combine_on")
     async def enable_combine(self, event: AstrMessageEvent):
         self.enabled = True
-        self.save_config()
-        logger.info("已开启消息合并功能")
-        try:
-            await event.send(MessageChain([Plain("已开启消息合并功能")]))
-        except Exception as e:
-            logger.error(f"回复消息失败: {e}")
-            return event.plain_result("已开启消息合并功能")
-        event.stop_event()
+        return event.plain_result("消息合并功能已开启。")
 
     @filter.command("combine_off")
     async def disable_combine(self, event: AstrMessageEvent):
         self.enabled = False
-        self.save_config()
-        logger.info("已关闭消息合并功能")
-        try:
-            await event.send(MessageChain([Plain("已关闭消息合并功能")]))
-        except Exception as e:
-            logger.error(f"回复消息失败: {e}")
-            return event.plain_result("已关闭消息合并功能")
-        event.stop_event()
+        return event.plain_result("消息合并功能已关闭。")
 
     @filter.command("combine_interval")
     async def set_interval(self, event: AstrMessageEvent):
@@ -248,24 +234,11 @@ class CombineMessagesPlugin(Star):
                 interval = min(max(interval, 0.1), 10)
                 self.interval_time = interval
                 self.message_buffer.interval_time = interval
-                self.save_config()
-                response = f"已设置消息合并间隔为 {interval} 秒"
+                return event.plain_result(f"已设置消息合并间隔为 {interval} 秒。")
             else:
-                response = f"当前消息合并间隔为 {self.interval_time} 秒"
-            logger.info(response)
-            try:
-                await event.send(MessageChain([Plain(response)]))
-            except Exception as e:
-                logger.error(f"回复消息失败: {e}")
-                return event.plain_result(response)
+                return event.plain_result(f"当前消息合并间隔为 {self.interval_time} 秒。用法: /combine_interval [秒数]")
         except Exception as e:
-            error_msg = f"设置失败: {str(e)}"
-            logger.error(error_msg)
-            try:
-                await event.send(MessageChain([Plain(error_msg)]))
-            except Exception as e2:
-                logger.error(f"回复消息失败: {e2}")
-                return event.plain_result(error_msg)
+            return event.plain_result(f"设置失败: {str(e)}")
 
     @filter.command("combine_delay")
     async def set_delay(self, event: AstrMessageEvent):
@@ -276,24 +249,11 @@ class CombineMessagesPlugin(Star):
                 delay = min(max(delay, 0.1), 2)
                 self.initial_delay = delay
                 self.message_buffer.initial_delay = delay
-                self.save_config()
-                response = f"已设置初始强制延迟为 {delay} 秒"
+                return event.plain_result(f"已设置初始强制延迟为 {delay} 秒。")
             else:
-                response = f"当前初始强制延迟为 {self.initial_delay} 秒"
-            logger.info(response)
-            try:
-                await event.send(MessageChain([Plain(response)]))
-            except Exception as e:
-                logger.error(f"回复消息失败: {e}")
-                return event.plain_result(response)
+                return event.plain_result(f"当前初始强制延迟为 {self.initial_delay} 秒。用法: /combine_delay [秒数]")
         except Exception as e:
-            error_msg = f"设置失败: {str(e)}"
-            logger.error(error_msg)
-            try:
-                await event.send(MessageChain([Plain(error_msg)]))
-            except Exception as e2:
-                logger.error(f"回复消息失败: {e2}")
-                return event.plain_result(error_msg)
+            return event.plain_result(f"设置失败: {str(e)}")
 
     @filter.event_message_type(
         filter.EventMessageType.GROUP_MESSAGE | filter.EventMessageType.PRIVATE_MESSAGE
