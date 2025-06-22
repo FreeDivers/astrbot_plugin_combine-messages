@@ -1,5 +1,5 @@
-name: combine_messages # 这是你的插件的唯一识别名。
+name: astrbot_plugin_combine_messages # 这是你的插件的唯一识别名。
 desc: 自动合并短时间内连续发送的消息，防止刷屏 # 插件简短描述
-version: v1.2 # 插件版本号
+version: v1.3 # 插件版本号
 author: FreeDivers # 作者
 repo: https://github.com/FreeDivers/astrbot_plugin_combine-messages # 插件的仓库地址
