@@ -180,6 +180,12 @@ class CombineMessagesPlugin(Star):
         await self.message_buffer.shutdown()
 
     def get_all_command_names(self) -> set[str]:
+        # ---- 安全初始化，防止未经过 __init__ 时访问报错 ----
+        if not hasattr(self, "_command_names_cache"):
+            self._command_names_cache = set()
+            self._command_names_cache_time = 0
+            self._command_names_cache_ttl = 60
+        # -----------------------------------------------
         now = time.time()
         if (
             self._command_names_cache
