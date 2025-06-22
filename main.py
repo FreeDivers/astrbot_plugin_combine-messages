@@ -22,8 +22,8 @@ class MessageBuffer:
     def __init__(self, context=None):
         self.buffer_pool: dict[str, dict] = {}
         self.lock = asyncio.Lock()
-        self.interval_time: float = 3
-        self.initial_delay: float = 0.5
+        self.interval_time = 3
+        self.initial_delay = 0.5  # 新增初始强制延迟
         self.context = context
 
     def get_session_id(self, event: AstrMessageEvent) -> str:
@@ -164,20 +164,16 @@ class MessageBuffer:
 class CombineMessagesPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        self.context = context
-        self.config = config
-        self.enabled = config.get("enabled", True)
-        self.interval_time = config.get("interval_time", 3)
-        self.initial_delay = config.get("initial_delay", 0.5)
-        self.message_buffer = MessageBuffer(context)
-        self._command_names_cache = set()
-        self._command_names_cache_time = 0
-        self._command_names_cache_ttl = 60  # 秒
+        self.enabled = True
+        self.interval_time = 3
+        self.initial_delay = 0.5
+        global message_buffer
+        message_buffer = MessageBuffer(context)
 
     async def initialize(self):
-        self.message_buffer.interval_time = self.interval_time
-        self.message_buffer.initial_delay = self.initial_delay
-        self.message_buffer.context = self.context
+        message_buffer.interval_time = self.interval_time
+        message_buffer.initial_delay = getattr(self, 'initial_delay', 0.5)
+        message_buffer.context = self.context
         logger.info("消息合并插件已初始化")
 
     async def shutdown(self):
@@ -218,12 +214,22 @@ class CombineMessagesPlugin(Star):
     @filter.command("combine_on")
     async def enable_combine(self, event: AstrMessageEvent):
         self.enabled = True
-        return event.plain_result("消息合并功能已开启。")
+        logger.info("已开启消息合并功能")
+        try:
+            await event.send(MessageChain([Plain("已开启消息合并功能")]))
+        except Exception as e:
+            logger.error(f"回复消息失败: {e}")
+            yield event.plain_result("已开启消息合并功能")
 
     @filter.command("combine_off")
     async def disable_combine(self, event: AstrMessageEvent):
         self.enabled = False
-        return event.plain_result("消息合并功能已关闭。")
+        logger.info("已关闭消息合并功能")
+        try:
+            await event.send(MessageChain([Plain("已关闭消息合并功能")]))
+        except Exception as e:
+            logger.error(f"回复消息失败: {e}")
+            yield event.plain_result("已关闭消息合并功能")
 
     @filter.command("combine_interval")
     async def set_interval(self, event: AstrMessageEvent):
@@ -233,12 +239,25 @@ class CombineMessagesPlugin(Star):
                 interval = float(args[1])
                 interval = min(max(interval, 0.1), 10)
                 self.interval_time = interval
-                self.message_buffer.interval_time = interval
-                return event.plain_result(f"已设置消息合并间隔为 {interval} 秒。")
+                message_buffer.interval_time = interval
+                response = f"已设置消息合并间隔为 {interval} 秒"
             else:
-                return event.plain_result(f"当前消息合并间隔为 {self.interval_time} 秒。用法: /combine_interval [秒数]")
+                response = f"当前消息合并间隔为 {self.interval_time} 秒"
+                
+            logger.info(response)
+            try:
+                await event.send(MessageChain([Plain(response)]))
+            except Exception as e:
+                logger.error(f"回复消息失败: {e}")
+                yield event.plain_result(response)
         except Exception as e:
-            return event.plain_result(f"设置失败: {str(e)}")
+            error_msg = f"设置失败: {str(e)}"
+            logger.error(error_msg)
+            try:
+                await event.send(MessageChain([Plain(error_msg)]))
+            except Exception as e2:
+                logger.error(f"回复消息失败: {e2}")
+                yield event.plain_result(error_msg)
 
     @filter.command("combine_delay")
     async def set_delay(self, event: AstrMessageEvent):
@@ -248,12 +267,25 @@ class CombineMessagesPlugin(Star):
                 delay = float(args[1])
                 delay = min(max(delay, 0.1), 2)
                 self.initial_delay = delay
-                self.message_buffer.initial_delay = delay
-                return event.plain_result(f"已设置初始强制延迟为 {delay} 秒。")
+                message_buffer.initial_delay = delay
+                response = f"已设置初始强制延迟为 {delay} 秒"
             else:
-                return event.plain_result(f"当前初始强制延迟为 {self.initial_delay} 秒。用法: /combine_delay [秒数]")
+                response = f"当前初始强制延迟为 {getattr(self, 'initial_delay', 0.5)} 秒"
+                
+            logger.info(response)
+            try:
+                await event.send(MessageChain([Plain(response)]))
+            except Exception as e:
+                logger.error(f"回复消息失败: {e}")
+                yield event.plain_result(response)
         except Exception as e:
-            return event.plain_result(f"设置失败: {str(e)}")
+            error_msg = f"设置失败: {str(e)}"
+            logger.error(error_msg)
+            try:
+                await event.send(MessageChain([Plain(error_msg)]))
+            except Exception as e2:
+                logger.error(f"回复消息失败: {e2}")
+                yield event.plain_result(error_msg)
 
     @filter.event_message_type(
         filter.EventMessageType.GROUP_MESSAGE | filter.EventMessageType.PRIVATE_MESSAGE
@@ -265,7 +297,7 @@ class CombineMessagesPlugin(Star):
             and event.message_obj.message_id.startswith("combined-")
         ) or not self.enabled:
             return
-
+        
         msg_text = event.message_str.strip()
         all_commands = self.get_all_command_names()
         first_token = msg_text.split()[0] if msg_text else ""
@@ -300,14 +332,3 @@ class CombineMessagesPlugin(Star):
         if has_content_to_merge:
             logger.info(f"消息已缓存用于合并: {event.get_message_outline()[:30]}...")
             event.stop_event()
-
-    def save_config(self):
-        self.config["enabled"] = self.enabled
-        self.config["interval_time"] = self.interval_time
-        self.config["initial_delay"] = self.initial_delay
-        # 直接保存 config 里的最新值
-        self.config["extra_commands"] = self.config.get("extra_commands", ["llm"])
-        self.config["block_prefixes"] = self.config.get(
-            "block_prefixes", ["/", "!", "！", ".", "。", "#", "%"]
-        )
-        self.config.save_config()
