@@ -1,7 +1,7 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageChain
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from astrbot.api.message_components import Plain, Image, BaseMessageComponent
+from astrbot.api.message_components import Plain, Image, At, BaseMessageComponent
 import asyncio
 import uuid
 import time
@@ -104,6 +104,9 @@ class MessageBuffer:
                 elif isinstance(comp, Image):
                     # 调用图片识别接口
                     merged_str_parts.append(await recognize_image_content(comp))
+                elif isinstance(comp, At):
+                    # 保留At信息的文本表示
+                    merged_str_parts.append(f"@{comp.qq}")
             merged_str = " ".join(merged_str_parts)
             if not merged_str.strip():
                 self.buffer_pool.pop(sid, None)
@@ -164,16 +167,16 @@ class MessageBuffer:
 class CombineMessagesPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        self.config = config
         self.enabled = True
         self.interval_time = 3
         self.initial_delay = 0.5
-        global message_buffer
-        message_buffer = MessageBuffer(context)
+        self.message_buffer = MessageBuffer(context)  # 改为实例属性
 
     async def initialize(self):
-        message_buffer.interval_time = self.interval_time
-        message_buffer.initial_delay = getattr(self, 'initial_delay', 0.5)
-        message_buffer.context = self.context
+        self.message_buffer.interval_time = self.interval_time
+        self.message_buffer.initial_delay = getattr(self, "initial_delay", 0.5)
+        self.message_buffer.context = self.context
         logger.info("消息合并插件已初始化")
 
     async def shutdown(self):
@@ -245,11 +248,11 @@ class CombineMessagesPlugin(Star):
                 interval = float(args[1])
                 interval = min(max(interval, 0.1), 10)
                 self.interval_time = interval
-                message_buffer.interval_time = interval
+                self.message_buffer.interval_time = interval  # 使用实例属性
                 response = f"已设置消息合并间隔为 {interval} 秒"
             else:
                 response = f"当前消息合并间隔为 {self.interval_time} 秒"
-                
+
             logger.info(response)
             try:
                 await event.send(MessageChain([Plain(response)]))
@@ -273,11 +276,13 @@ class CombineMessagesPlugin(Star):
                 delay = float(args[1])
                 delay = min(max(delay, 0.1), 2)
                 self.initial_delay = delay
-                message_buffer.initial_delay = delay
+                self.message_buffer.initial_delay = delay  # 使用实例属性
                 response = f"已设置初始强制延迟为 {delay} 秒"
             else:
-                response = f"当前初始强制延迟为 {getattr(self, 'initial_delay', 0.5)} 秒"
-                
+                response = (
+                    f"当前初始强制延迟为 {getattr(self, 'initial_delay', 0.5)} 秒"
+                )
+
             logger.info(response)
             try:
                 await event.send(MessageChain([Plain(response)]))
@@ -303,7 +308,7 @@ class CombineMessagesPlugin(Star):
             and event.message_obj.message_id.startswith("combined-")
         ) or not self.enabled:
             return
-        
+
         msg_text = event.message_str.strip()
         all_commands = self.get_all_command_names()
         first_token = msg_text.split()[0] if msg_text else ""
@@ -332,6 +337,9 @@ class CombineMessagesPlugin(Star):
                 await self.message_buffer.add_component(event, comp)
                 has_content_to_merge = True
             elif isinstance(comp, Image):
+                await self.message_buffer.add_component(event, comp)
+                has_content_to_merge = True
+            elif isinstance(comp, At):
                 await self.message_buffer.add_component(event, comp)
                 has_content_to_merge = True
 
