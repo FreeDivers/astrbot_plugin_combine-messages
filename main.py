@@ -220,10 +220,10 @@ class CombineMessagesPlugin(Star):
         self.config = config
         self.enabled = bool(self.config.get("enabled", SCHEMA_DEFAULTS.get("enabled", True)))
         self.interval_time = self._config_float(
-            "interval_time", SCHEMA_DEFAULTS.get("interval_time")
+            "interval_time", SCHEMA_DEFAULTS.get("interval_time", 3.0)
         )
         self.initial_delay = self._config_float(
-            "initial_delay", SCHEMA_DEFAULTS.get("initial_delay")
+            "initial_delay", SCHEMA_DEFAULTS.get("initial_delay", 0.5)
         )
         self.message_buffer = MessageBuffer(
             context,
