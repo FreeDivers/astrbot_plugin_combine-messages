@@ -3,13 +3,32 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from astrbot.api.message_components import Plain, Image, At, File, BaseMessageComponent
 import asyncio
+import json
 import uuid
 import time
+from pathlib import Path
 from astrbot.api.platform import AstrBotMessage
 from astrbot.core.star.filter.command import CommandFilter
 from astrbot.core.star.filter.command_group import CommandGroupFilter
 from astrbot.core.star.star_handler import star_handlers_registry
 from astrbot.api import AstrBotConfig
+
+
+def load_schema_defaults() -> dict:
+    try:
+        schema_path = Path(__file__).with_name("_conf_schema.json")
+        with schema_path.open("r", encoding="utf-8") as f:
+            schema = json.load(f)
+        return {
+            key: value.get("default")
+            for key, value in schema.items()
+            if isinstance(value, dict) and "default" in value
+        }
+    except Exception:
+        return {}
+
+
+SCHEMA_DEFAULTS = load_schema_defaults()
 
 
 # 预留图片识别接口
@@ -47,11 +66,11 @@ async def recognize_file_content(file: File) -> str:
 
 
 class MessageBuffer:
-    def __init__(self, context=None):
+    def __init__(self, context=None, interval_time: float = 0.0, initial_delay: float = 0.0):
         self.buffer_pool: dict[str, dict] = {}
         self.lock = asyncio.Lock()
-        self.interval_time = 3
-        self.initial_delay = 0.5  # 新增初始强制延迟
+        self.interval_time = interval_time
+        self.initial_delay = initial_delay
         self.context = context
 
     def get_session_id(self, event: AstrMessageEvent) -> str:
@@ -199,14 +218,31 @@ class CombineMessagesPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
-        self.enabled = True
-        self.interval_time = 3
-        self.initial_delay = 0.5
-        self.message_buffer = MessageBuffer(context)  # 改为实例属性
+        self.enabled = bool(self.config.get("enabled", SCHEMA_DEFAULTS.get("enabled", True)))
+        self.interval_time = self._config_float(
+            "interval_time", SCHEMA_DEFAULTS.get("interval_time")
+        )
+        self.initial_delay = self._config_float(
+            "initial_delay", SCHEMA_DEFAULTS.get("initial_delay")
+        )
+        self.message_buffer = MessageBuffer(
+            context,
+            interval_time=self.interval_time,
+            initial_delay=self.initial_delay,
+        )
+
+    def _config_float(self, key: str, fallback=None) -> float:
+        value = self.config.get(key, fallback)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            if fallback is None:
+                return 0.0
+            return float(fallback)
 
     async def initialize(self):
         self.message_buffer.interval_time = self.interval_time
-        self.message_buffer.initial_delay = getattr(self, "initial_delay", 0.5)
+        self.message_buffer.initial_delay = self.initial_delay
         self.message_buffer.context = self.context
         logger.info("消息合并插件已初始化")
 
@@ -310,9 +346,7 @@ class CombineMessagesPlugin(Star):
                 self.message_buffer.initial_delay = delay  # 使用实例属性
                 response = f"已设置初始强制延迟为 {delay} 秒"
             else:
-                response = (
-                    f"当前初始强制延迟为 {getattr(self, 'initial_delay', 0.5)} 秒"
-                )
+                response = f"当前初始强制延迟为 {self.initial_delay} 秒"
 
             logger.info(response)
             try:
